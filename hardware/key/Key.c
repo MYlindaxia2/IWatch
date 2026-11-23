@@ -1,12 +1,14 @@
 #include "stm32f10x.h"                  // Device header
 #include "../hardware/delay/Delay.h"
-
+#include "./Key.h"
 uint8_t count = 0;
 /**
   * 函    数：按键初始化
   * 参    数：无
   * 返 回 值：无
   */
+
+
 void Key_Init(void)
 {
 	/*开启时钟*/
@@ -56,7 +58,7 @@ uint8_t Key_GetNum(void)
 }
 
 
-uint8_t KeyGetNumState(void)
+KeyFun KeyGetNumState(void)
 {
 	uint8_t raw = 0;
 	static uint8_t lastRaw = 0;
@@ -70,24 +72,24 @@ uint8_t KeyGetNumState(void)
 	{
 		lastRaw = raw;
 		count = 0;
-		return 0;
+		return NONE;
 	}
 	if(count < 20)
 	{
-		return 0;
+		return NONE;
 	}
 	// 按键稳定结束,松开之前
 	if(raw != 0)
 	{
 		pressed = raw;
-		return 0;
+		return NONE;
 	}else
 	{
-		uint8_t key = pressed;
+		KeyFun key = pressed;
 		pressed = 0;
 		return key;
 	}
-	return 0;
+	return NONE;
 }
 
 /* 定时器中断函数，可以复制到使用它的地方 */
