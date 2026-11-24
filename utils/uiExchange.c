@@ -1,6 +1,10 @@
 #include "uiExchange.h"
 #include <stdint.h>
 #include "../hardware/key/Key.h"
+#include "../hardware/oled/OLED.h"
+
+uint8_t navStack[NAV_MAX];
+uint8_t navDepth = 0;
 
 void Nav_Switch(uint8_t id, uint8_t sel, Page *pages)
 {
@@ -29,12 +33,16 @@ void Ui_Input(Page *pages)
     KeyFun k = KeyGetNumState();
     Page *p = &pages[curId];
 
+    if(k == ACT_EDIT)
+    {
+        
+    }
     if(k == NONE || p->count == 0) return;
     if(k == LEFT)
     {
         if(p->sel + 1 >= p->count && p->leftTo.page != PG_NONE)
         {
-            Nav_Switch(p->leftTo.page, p->leftTo.sel);
+            Nav_Switch(p->leftTo.page, p->leftTo.sel, pages);
             return;
         }
         p->sel = (uint8_t)((p->sel + 1) % p->count);
