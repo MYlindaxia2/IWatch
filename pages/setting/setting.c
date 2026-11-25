@@ -1,19 +1,39 @@
-#include "../hardware/oled/OLED.h"
-#include "../utils/uiExchange.h"
-enum {EDIT,UPDATE_DATE, COUNT};
-uint8_t curId = EDIT;
+#include "../../hardware/oled/OLED.h"
+#include "../../utils/uiExchange.h"
+#include "setting.h"
 
-const Item editItems[] =
-{
-    { { 0,  0, 32, 16 }, ACT_BACK, 0,0, 0 },   /* EXIT        */
-    // { { 0, 16, 64, 16 }, ACT_GOTO, UP_DATE, 0, 0 },   /* Update Date */
-    { { 0, 16, 64, 16 }, ACT_GOTO, 0, 0, 0 },   /* Update Date */
-};
+/* ============================================================================
+ * 设置页：一个"返回" + 一个"设置日期"
+ *
+ * 这是最简单的一个页面，可以把它当成"怎么写新页面"的模板：
+ *   static 画函数  →  static 选项表  →  一个对外 Page，就完事了
+ *
+ * 注意这里没有：自己的页号枚举、进入/退出函数、curId 赋值。
+ * 那些都属于内核，页面只管描述自己长什么样。
+ * ========================================================================== */
 
-void EditPage(void)
+/* 只画文字。高亮由 Ui_Draw 根据 items[sel].hot 统一反显 */
+static void EditPage(void)
 {
-    OLED_ShowString(0,  0, "返回",OLED_8X16);
-    OLED_ShowString(0, 16, "设置日期",OLED_8X16);
+    OLED_ShowString(0,  0, "返回",     OLED_8X16);
+    OLED_ShowString(0, 16, "设置日期", OLED_8X16);
 }
 
-Page editPage = {editItems, ITEM_COUNT(editItems), 0, EditPage, LINK_NONE,LINK_NONE};
+/* ----------------------------------------------------------------------------
+ * 选项表
+ *
+ *   返回     → ACT_BACK：出栈，回到进入本页的那一页（主页）
+ *   设置日期 → ACT_GOTO + PG_DATE：进日期页，落在目标页第 0 项（"返回"）
+ *
+ * 对比一下：同样是"回上一页"，这里用 ACT_BACK 而不是 ACT_GOTO + PG_MAIN。
+ * 用 ACT_BACK 的话，将来这个设置页从别的地方也能进，返回目标会自动正确；
+ * 写死 PG_MAIN 就把"只能从主页进"这个限制焊死了。
+ * -------------------------------------------------------------------------- */
+static const Item editItems[] =
+{
+    { { 0,  0, 32, 16 }, ACT_BACK, 0,       0, 0 },   /* 返回 */
+    { { 0, 16, 64, 16 }, ACT_GOTO, PG_DATE, 0, 0 },   /* 设置日期 */
+};
+
+/* 左右到头就环绕（这页太短，没有"下一页"），所以两个出口都是 LINK_NONE */
+Page editPage = { editItems, ITEM_COUNT(editItems), 0, EditPage, LINK_NONE, LINK_NONE };

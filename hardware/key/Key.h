@@ -10,5 +10,5 @@ typedef enum
 }KeyFun;
 void Key_Init(void);
 uint8_t Key_GetNum(void);
-uint8_t KeyGetNumState(void);
+KeyFun KeyGetNumState(void);		/* 返回类型必须与 Key.c 一致（enum，不是 uint8_t） */
 #endif

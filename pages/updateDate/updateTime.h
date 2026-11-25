@@ -1,11 +1,10 @@
 #ifndef __UPDATETIME_H
 #define __UPDATETIME_H
-#include "../utils/uiExchange.h"
 
-void UpdateDatePage(void);
-void UpdateTimePage(void);
+#include "../../utils/uiExchange.h"
 
-extern const Item dateItems[];
-extern const Item timeItems[];
+/* 这两个页面只导出各自的 Page */
+extern Page datePage;
+extern Page timePage;
 
-#endif
+#endif /* __UPDATETIME_H */

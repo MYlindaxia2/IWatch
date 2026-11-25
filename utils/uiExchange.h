@@ -1,61 +1,163 @@
-#include <stdint.h>
 #ifndef __UIEXCHANGE_H
 #define __UIEXCHANGE_H
-#define NAV_MAX 6
-#define PG_NONE 0xFF
-#define ITEM_COUNT(a) (uint8_t) (sizeof(a) / sizeof((a)[0]))
-#define LINK_NONE {PG_NONE, 0}
 
-extern uint8_t navStack[NAV_MAX];
-extern uint8_t navDepth;
-// 应该是MAIN
-extern uint8_t curId;
+#include <stdint.h>
 
-typedef struct {
-    uint8_t page;
-    uint8_t sel;
-}Link;
+/* ============================================================================
+ * 整个 UI 就是「一张页面表 + 一份输入逻辑」。
+ *
+ * 页面之间的差异（显示什么、按下去去哪）全部写成数据 —— Item[] 和 Page。
+ * 所有页面共有的行为（左右怎么移光标、越界怎么办、高亮怎么画、怎么返回）
+ * 全部写在 utils/uiExchange.c 里，只写一遍。
+ *
+ * 判断某段代码该放哪：
+ *   "这一页长什么样 / 按下去去哪"  → 页面文件里的数据
+ *   "所有页都怎么响应按键"          → 内核 uiExchange.c
+ * ========================================================================== */
 
-typedef struct {
-    uint16_t x,y,w,h;
-}HotSpot;
+/* ============================================================================
+ * 页号：全工程唯一的一份
+ *
+ * 必须是唯一一份。之前每个页面各自写 enum {EDIT,...}，结果 EDIT 在
+ * menu.c 里是 2、在 setting.c 里是 0，同一个名字两个值，curId 的含义
+ * 就取决于最后是谁写的 —— 所有导航错乱都是这么来的。
+ *
+ * 新增页面：这里加一个 PG_xxx，再去 main.c 的 pages[] 里填一行。
+ * ========================================================================== */
+typedef enum
+{
+    PG_MAIN = 0,
+    PG_MENU,        /* 菜单页还没写，先占位；pages[PG_MENU] 为 NULL，按下去无反应 */
+    PG_EDIT,
+    PG_DATE,
+    PG_TIME,
+    PG_COUNT        /* 只是个"页数"，永远放在最后，用来定数组大小 */
+} PageId;
 
-typedef enum {
-    ACT_NONE = 0,
-    ACT_GOTO = 1,
-    ACT_BACK = 2,
-    ACT_EDIT = 3,
-}ActKind;
+/* 返回栈最大深度。超过就不记录了（宁可返不回去，也不能越界写内存） */
+#define NAV_MAX         6
 
-typedef struct {
-    HotSpot hot;
-    ActKind act;
-    uint8_t target;
-    void (*call)(uint8_t);
-    uint8_t arg;
-}Item;
+/* Link.page 取这个值 = "这页没有下一页，环绕就行"。
+ * 注意不能用 0 表示，因为 0 是合法的 PG_MAIN。 */
+#define PG_NONE         0xFF
 
-typedef struct{
-    const Item *items;
-    uint8_t count;
-    uint8_t sel;
-    void (*draw)(void);
-    Link leftTo;
-    Link rightTo;
-}Page;
+/* 数组元素个数。用它给 count 赋值，就不用手工数、也不会漏改 */
+#define ITEM_COUNT(a)   ((uint8_t)(sizeof(a) / sizeof((a)[0])))
 
+/* "没有下一页"的 Link 简写，用在 Page 初始化里 */
+#define LINK_NONE       { PG_NONE, 0 }
 
-void Nav_Switch(uint8_t id, uint8_t sel, Page *pages);
+/* ============================================================================
+ * Link：一次跳转的目标 = 去哪一页 + 落在第几项
+ *
+ * 为什么把 page 和 sel 打包，而不是只存页号？
+ * 因为同一页从不同方向进来，落点不一样。
+ * 例如时间页往右翻要回到日期页的"日"(第3项)，往左翻要回到"返回"(第0项)。
+ * 如果落点存在目标页上（以前那种 enterSel），一个字段只能表达一种，
+ * 总有一个方向是错的。
+ * ========================================================================== */
+typedef struct
+{
+    uint8_t page;       /* 目标页号 PG_xxx，或 PG_NONE */
+    uint8_t sel;        /* 落在该页的第几项（0 起） */
+} Link;
 
-void Nav_GotoAt(uint8_t id,uint8_t sel, Page *pages);
+/* ============================================================================
+ * HotSpot：选项在屏幕上的矩形，画高亮用
+ *
+ * 把坐标做成数据，好处是 Ui_Draw 里只有一句 OLED_ReverseArea(...)，
+ * 不用每个页面写一串 if-else 判断"现在选中第几项、该反显哪一块"。
+ * ========================================================================== */
+typedef struct
+{
+    uint16_t x, y, w, h;
+} HotSpot;
 
-void Nav_Goto(uint8_t id);
+/* ============================================================================
+ * 按下 ENTER 时做什么
+ * ========================================================================== */
+typedef enum
+{
+    ACT_NONE = 0,   /* 不换页（只想执行 call 时用它） */
+    ACT_GOTO = 1,   /* 进入子页：压栈，能返回 */
+    ACT_BACK = 2,   /* 返回上一层：出栈 */
+    ACT_EDIT = 3    /* 进入/退出编辑态（逻辑还没写，目前按了没反应） */
+} ActKind;
 
+/* ============================================================================
+ * Item：一个可选项
+ *
+ * 举三个真实例子，看数据怎么表达行为：
+ *
+ *   { {0,0,32,16}, ACT_BACK, 0,       NULL, 0 }   返回：出栈
+ *   { {0,16,64,16}, ACT_GOTO, PG_DATE, NULL, 0 }  设置日期：进日期页，落在第0项
+ *   { {0,16,16,16}, ACT_EDIT, 0,       NULL, 0 }  年：交给编辑态处理
+ *
+ * call/arg 是给"有副作用"的选项用的，例如按一下让年份 +1：
+ *   call = Field_Add, arg = 0   （arg 正好是 MyRTC_Time 的下标）
+ * ========================================================================== */
+typedef struct
+{
+    HotSpot  hot;               /* 选中时反显哪一块 */
+    ActKind  act;               /* ENTER 时做什么 */
+    uint8_t  target;            /* 仅 ACT_GOTO 用：目标页号 */
+    void   (*call)(uint8_t);    /* 附加动作，可为 NULL */
+    uint8_t  arg;               /* 传给 call 的参数 */
+} Item;
+
+/* ============================================================================
+ * Page：一页
+ *
+ * sel 放在 Page 里（而不是全局）有两个白送的好处：
+ *   1. 每个页面各自记住自己的光标位置 —— 从时间页翻回日期页，
+ *      光标还停在"日"上，不用写任何"返回时定位"的代码。
+ *   2. 页面天然变成"单例"，同一个 Page 只能出现一次。
+ *      如果以后需要同一页同时出现在两个位置，才需要把 sel 拆到栈里存副本。
+ * ========================================================================== */
+typedef struct
+{
+    const Item *items;          /* 选项表 */
+    uint8_t     count;          /* 选项个数；sel 恒在 0..count-1，没有"无选中"这种状态 */
+    uint8_t     sel;            /* 当前选中项 —— 页面的"记忆" */
+    void      (*draw)(void);    /* 只画静态内容，高亮由 Ui_Draw 统一画 */
+
+    /* 越界翻页：把方向键想象成在一条连续长列表上移动，页面只是显示窗口。
+     * 日期页和时间页就是这样连成"书的两页"的。 */
+    Link        leftTo;         /* 在最后一项继续按 LEFT：去哪页、落哪项 */
+    Link        rightTo;        /* 在第一项继续按 RIGHT：去哪页、落哪项 */
+} Page;
+
+/* ============================================================================
+ * 页面表：整个 UI 唯一一张，定义在 pages/main/main.c
+ *
+ * 为什么是指针数组（Page *）而不是结构体数组（Page）？
+ *   - 页面对象定义在各页面文件里，这里只登记"地址"
+ *   - 允许留空（NULL），页面没写完整也能先编译运行
+ *   - Page 内部有 mutable 的 sel，用指针才能让各文件真正共用同一份状态
+ *
+ * 调用时传 pages（数组名，自动退化成 Page**），函数形参是 Page *pages[]。
+ * 千万不要传 *pages —— 那是第一个元素（Page*），函数内部 pages[curId]
+ * 会按 Page 大小在结构体外面乱走，最终 call 到非法地址。
+ * ========================================================================== */
+extern Page *pages[PG_COUNT];
+
+/* ============================================================================
+ * 内核接口（实现都在 utils/uiExchange.c）
+ * ========================================================================== */
+
+/* 主循环每帧调用一次：清屏 → 处理输入 → 绘制 → 刷屏。
+ * 名字故意不叫 ShowMasterPage —— 它不是"主页"，它是整个 UI 的节拍器。 */
+void Ui_Task(void);
+
+void Ui_Input(Page *pages[]);
+void Ui_Draw(Page *pages[]);
+
+/* 导航三兄弟，区别只在压不压栈：
+ *   Nav_Switch  平级平移（翻页），不压栈 —— 否则来回翻几次就把返回栈塞满
+ *   Nav_GotoAt  进入子页，压栈，可指定落点
+ *   Nav_Back    出栈返回 */
+void Nav_Switch(uint8_t id, uint8_t sel, Page *pages[]);
+void Nav_GotoAt(uint8_t id, uint8_t sel, Page *pages[]);
 void Nav_Back(void);
 
-void Ui_Input(Page *pages);
-
-void Ui_Draw(Page *pages);
-
-#endif // !__UIEXCHANGE_H
-
+#endif /* __UIEXCHANGE_H */
