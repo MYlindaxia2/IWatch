@@ -1,7 +1,7 @@
 #include "../../hardware/oled/OLED.h"
 #include "../../hardware/rtc/MyRTC.h"
 #include "../../utils/uiExchange.h"
-#include "../setting/setting.h"
+#include "../edit/edit.h"
 #include "../updateDate/updateTime.h"
 #include "main.h"
 

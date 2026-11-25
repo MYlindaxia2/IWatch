@@ -1,6 +1,6 @@
 #include "../../hardware/oled/OLED.h"
 #include "../../utils/uiExchange.h"
-#include "setting.h"
+#include "edit.h"
 
 /* ============================================================================
  * 设置页：一个"返回" + 一个"设置日期"

@@ -1,5 +1,5 @@
-#ifndef __SETTING_H
-#define __SETTING_H
+#ifndef __EDIT_H
+#define __EDIT_H
 
 #include "../../utils/uiExchange.h"
 

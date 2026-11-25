@@ -7,4 +7,8 @@
 extern Page datePage;
 extern Page timePage;
 
+void AddDateOrTime(uint8_t index);
+
+void SubDateOrTime(uint8_t index);
+
 #endif /* __UPDATETIME_H */

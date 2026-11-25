@@ -3,6 +3,18 @@
 #include "../../utils/uiExchange.h"
 #include "updateTime.h"
 
+
+void AddDateOrTime(uint8_t index)
+{
+    MyRTC_Time[index]++;
+    MyRTC_SetTime();
+}
+
+void SubDateOrTime(uint8_t index)
+{
+    MyRTC_Time[index]--;
+    MyRTC_SetTime();
+}
 /* ============================================================================
  * 日期页（年 / 月 / 日）和时间页（时 / 分 / 秒）
  *
@@ -80,7 +92,7 @@ static const Item timeItems[] =
  * 那么"从时间页翻回来落在日"和"从设置页进来落在返回"必然冲突。
  * -------------------------------------------------------------------------- */
 Page datePage = { dateItems, ITEM_COUNT(dateItems), 0, UpdateDatePage,
-                  { PG_TIME, 0 }, LINK_NONE };
+                  { PG_TIME, 0 }, {PG_TIME, 2} };
 
 Page timePage = { timeItems, ITEM_COUNT(timeItems), 0, UpdateTimePage,
                   { PG_DATE, 0 }, { PG_DATE, 3 } };

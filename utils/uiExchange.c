@@ -1,7 +1,7 @@
 #include "uiExchange.h"
 #include "../hardware/key/Key.h"
 #include "../hardware/oled/OLED.h"
-
+#include "../pages/updateDate/updateTime.h"
 /* ============================================================================
  * 这个文件是整个 UI 的"内核"，只干三件事：
  *   1. 记住"现在在哪一页"（curId）和"从哪来的"（navStack）
@@ -22,7 +22,7 @@
 static uint8_t navStack[NAV_MAX];   /* 返回栈：存的是页号，不是指针 */
 static uint8_t navDepth = 0;        /* 栈深度，同时也是"下一格写哪里" */
 static uint8_t curId   = PG_MAIN;   /* 开机在主页 */
-
+static uint8_t editState = 0;       /* 0关闭修改、1开启修改 */
 /* 取当前页。
  * 注意返回的是指针：pages[] 是指针数组，pages[curId] 才是 Page 本体。
  * 早期写成 &pages[curId] 是个经典错误 —— pages 是 Page* 的数组，
@@ -79,6 +79,8 @@ void Nav_Back(void)
     if (navDepth > 0) curId = navStack[--navDepth];
 }
 
+
+
 /* ============================================================================
  * 输入：所有页面共用这一份
  *
@@ -90,10 +92,28 @@ void Ui_Input(Page *pages[])
 {
     KeyFun k = KeyGetNumState();
     Page  *p = Ui_Cur(pages);       /* p 就是"我这一页"，不用再判断是第几层 */
-
+    
     if (p == 0) return;             /* 页面还没写 */
     if (k == NONE || p->count == 0) return;   /* 没按键 / 页面没有选项 */
+    const Item *it = &p->items[p->sel];
 
+    if(editState)
+    {
+        switch (k)
+        {
+        case LEFT:
+            AddDateOrTime(it->arg);
+            return;
+        case RIGHT:
+            SubDateOrTime(it->arg);
+            return;
+        case ENTER:
+            editState = 0;
+            return;
+        default:
+            break;
+        }
+    }
     /* ---- 左键：往下走一格（sel + 1） ---- */
     if (k == LEFT)
     {
@@ -128,7 +148,6 @@ void Ui_Input(Page *pages[])
 
     /* ---- 确认键 ---- */
     {
-        const Item *it = &p->items[p->sel];
 
         /* 先执行附加动作，再处理换页：
          * 这样"改完日期立刻跳走"这种组合只需要在数据里写一个 call + 一个 act。 */
@@ -138,8 +157,10 @@ void Ui_Input(Page *pages[])
         {
         case ACT_GOTO: Nav_GotoAt(it->target, 0, pages); break;   /* 落在目标页第 0 项 */
         case ACT_BACK: Nav_Back();                       break;
+        case ACT_EDIT: editState = 1;                    break;
         default:                                         break;   /* ACT_NONE / ACT_EDIT 暂无动作 */
         }
+        return;
     }
 }
 
