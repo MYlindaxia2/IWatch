@@ -3,6 +3,8 @@
 #include "../../utils/uiExchange.h"
 #include "../edit/edit.h"
 #include "../updateDate/updateTime.h"
+#include "../menu/menu.h"
+#include "../light/light.h"
 #include "main.h"
 
 /* ============================================================================
@@ -76,5 +78,7 @@ Page *pages[PG_COUNT] =
     [PG_EDIT] = &editPage,
     [PG_DATE] = &datePage,
     [PG_TIME] = &timePage,
+    [PG_MENU] = &menuPage,
+    [PG_LIGHT] = &lightPage,
     /* [PG_MENU] = &menuPage,   ← 菜单页写好后在这里补一行 */
 };

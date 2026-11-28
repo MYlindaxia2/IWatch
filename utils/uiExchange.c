@@ -45,6 +45,8 @@ static Page *Ui_Cur(Page *pages[])
  * PG_DATE/PG_TIME，之后再按"返回"，弹出的就是时间页而不是设置页。
  * ========================================================================== */
 
+
+
 /* 平级平移（翻页） */
 void Nav_Switch(uint8_t id, uint8_t sel, Page *pages[])
 {
@@ -76,7 +78,9 @@ void Nav_GotoAt(uint8_t id, uint8_t sel, Page *pages[])
 void Nav_Back(void)
 {
     /* 空栈就不动，避免 navDepth 下溢成 255 */
+    
     if (navDepth > 0) curId = navStack[--navDepth];
+
 }
 
 
@@ -96,6 +100,7 @@ void Ui_Input(Page *pages[])
     if (p == 0) return;             /* 页面还没写 */
     if (k == NONE || p->count == 0) return;   /* 没按键 / 页面没有选项 */
     const Item *it = &p->items[p->sel];
+
 
     if(editState)
     {
@@ -133,6 +138,7 @@ void Ui_Input(Page *pages[])
     /* ---- 右键：往上走一格（sel - 1） ---- */
     if (k == RIGHT)
     {
+
         if (p->sel == 0 && p->rightTo.page != PG_NONE)
         {
             Nav_Switch(p->rightTo.page, p->rightTo.sel, pages);
@@ -158,6 +164,7 @@ void Ui_Input(Page *pages[])
         case ACT_GOTO: Nav_GotoAt(it->target, 0, pages); break;   /* 落在目标页第 0 项 */
         case ACT_BACK: Nav_Back();                       break;
         case ACT_EDIT: editState = 1;                    break;
+        case ACT_GOTO_FUNCTION: it->enter();             break;
         default:                                         break;   /* ACT_NONE / ACT_EDIT 暂无动作 */
         }
         return;

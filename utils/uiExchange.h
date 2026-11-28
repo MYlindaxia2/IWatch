@@ -31,6 +31,7 @@ typedef enum
     PG_EDIT,
     PG_DATE,
     PG_TIME,
+    PG_LIGHT,
     PG_COUNT        /* 只是个"页数"，永远放在最后，用来定数组大小 */
 } PageId;
 
@@ -81,7 +82,8 @@ typedef enum
     ACT_NONE = 0,   /* 不换页（只想执行 call 时用它） */
     ACT_GOTO = 1,   /* 进入子页：压栈，能返回 */
     ACT_BACK = 2,   /* 返回上一层：出栈 */
-    ACT_EDIT = 3    /* 进入/退出编辑态（逻辑还没写，目前按了没反应） */
+    ACT_EDIT = 3,    /* 进入/退出编辑态（逻辑还没写，目前按了没反应） */
+    ACT_GOTO_FUNCTION = 4,
 } ActKind;
 
 /* ============================================================================
@@ -103,6 +105,7 @@ typedef struct
     uint8_t  target;            /* 仅 ACT_GOTO 用：目标页号 */
     void   (*call)(uint8_t);    /* 附加动作，可为 NULL */
     uint8_t  arg;               /* 传给 call 的参数 */
+    void    (*enter)(void);
 } Item;
 
 /* ============================================================================
